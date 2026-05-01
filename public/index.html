@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#18202f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Aula Clara">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Aula Clara</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body data-mobile-view="record">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">AC</div>
+          <div>
+            <h1>Aula Clara</h1>
+            <p>Grabaciones, transcripciones y estudio</p>
+          </div>
+        </div>
+        <div class="api-pill" id="apiStatus">Conectando...</div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar" data-mobile-view="classes" aria-label="Clases">
+          <div class="sidebar-head">
+            <h2>Clases</h2>
+            <button class="icon-button" id="newSessionBtn" type="button" title="Nueva clase">+</button>
+          </div>
+          <div class="session-list" id="sessionList"></div>
+        </aside>
+
+        <section class="class-panel" data-mobile-view="record" aria-label="Clase actual">
+          <div class="class-head">
+            <input id="titleInput" class="title-input" type="text" maxlength="80" aria-label="Titulo de la clase">
+            <div class="timer" id="timer">00:00</div>
+          </div>
+
+          <div class="recorder-strip">
+            <div class="recording-state" id="recordingState">Lista para grabar</div>
+            <div class="recording-actions">
+              <button class="primary" id="recordBtn" type="button">Grabar</button>
+              <button id="pauseBtn" type="button" disabled>Pausar</button>
+              <button id="stopBtn" type="button" disabled>Detener</button>
+            </div>
+          </div>
+
+          <div class="audio-row">
+            <audio id="audioPlayer" controls></audio>
+            <label class="file-button">
+              Importar audio
+              <input id="audioFileInput" type="file" accept="audio/*">
+            </label>
+          </div>
+
+          <div class="tools-row">
+            <button id="transcribeBtn" type="button" disabled>Transcribir audio</button>
+            <button id="dictationBtn" type="button">Dictado en vivo</button>
+            <div class="mini-status" id="dictationStatus"></div>
+          </div>
+
+          <label class="field-label" for="transcriptInput">Transcripcion</label>
+          <textarea id="transcriptInput" spellcheck="true" placeholder="La transcripcion de la clase aparecera aqui."></textarea>
+        </section>
+
+        <aside class="study-panel" data-mobile-view="study" aria-label="Estudio">
+          <div class="study-block">
+            <div class="section-title">
+              <h2>Resumen</h2>
+              <button id="summaryBtn" type="button">Generar</button>
+            </div>
+            <div class="summary-output empty" id="summaryOutput">Sin resumen todavia.</div>
+          </div>
+
+          <div class="study-block chat-block">
+            <div class="section-title">
+              <h2>Preguntas</h2>
+            </div>
+            <div class="chat-log" id="chatLog"></div>
+            <form class="question-form" id="questionForm">
+              <input id="questionInput" type="text" autocomplete="off" placeholder="Pregunta sobre la clase">
+              <button type="submit">Enviar</button>
+            </form>
+          </div>
+        </aside>
+      </main>
+
+      <nav class="mobile-tabs" aria-label="Navegacion movil">
+        <button class="mobile-tab" data-target-view="classes" type="button">Clases</button>
+        <button class="mobile-tab active" data-target-view="record" type="button">Grabar</button>
+        <button class="mobile-tab" data-target-view="study" type="button">Estudiar</button>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "aula-clara",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP web para grabar clases, transcribir audio, resumir y preguntar sobre la transcripcion.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

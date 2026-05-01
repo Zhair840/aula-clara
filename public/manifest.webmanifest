@@ -1,0 +1,20 @@
+{
+  "name": "Aula Clara",
+  "short_name": "Aula Clara",
+  "description": "Graba clases, guarda transcripciones, genera resumenes y haz preguntas de estudio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#18202f",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
