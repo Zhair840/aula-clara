@@ -1,4 +1,4 @@
-const CACHE_NAME = "aula-clara-v1";
+const CACHE_NAME = "aula-clara-v3";
 const APP_SHELL = [
   "/",
   "/index.html",

@@ -40,6 +40,9 @@ let pausedAt = 0;
 let pausedMs = 0;
 let recognition = null;
 let recognizing = false;
+let dictationWanted = false;
+let dictationRestartHandle = null;
+let dictationWakeLock = null;
 let saveHandle = null;
 let aiReady = false;
 
@@ -680,6 +683,123 @@ async function importAudio(file) {
   showToast("Audio importado.");
 }
 
+function compactText(text) {
+  return normalizeText(text)
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function removeDictationOverlap(existingText, incomingText) {
+  const incomingWords = incomingText.trim().split(/\s+/).filter(Boolean);
+  if (!incomingWords.length) return "";
+
+  const existingWords = compactText(existingText).split(/\s+/).filter(Boolean);
+  const incomingKeys = incomingWords.map((word) => compactText(word)).filter(Boolean);
+  if (!incomingKeys.length) return "";
+
+  const existingTail = existingWords.slice(-80).join(" ");
+  const incomingKey = incomingKeys.join(" ");
+  if (existingTail.endsWith(incomingKey)) {
+    return "";
+  }
+
+  const maxOverlap = Math.min(existingWords.length, incomingKeys.length);
+  let overlap = 0;
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    const tail = existingWords.slice(-size).join(" ");
+    const head = incomingKeys.slice(0, size).join(" ");
+    if (tail === head) {
+      overlap = size;
+      break;
+    }
+  }
+
+  return incomingWords.slice(overlap).join(" ").trim();
+}
+
+function appendDictationText(text) {
+  const cleanText = text.trim().replace(/\s+/g, " ");
+  if (!cleanText) return;
+
+  const newText = removeDictationOverlap(els.transcriptInput.value, cleanText);
+  if (!newText) return;
+
+  const session = currentSession();
+  const separator = els.transcriptInput.value.trim() ? "\n" : "";
+  els.transcriptInput.value += `${separator}${newText}`;
+  if (session) {
+    session.transcript = els.transcriptInput.value;
+    markSessionUpdated(session);
+  }
+}
+
+function updateDictationUi(status) {
+  els.dictationBtn.textContent = dictationWanted ? "Detener dictado" : "Dictado en vivo";
+  els.dictationStatus.textContent = status || "";
+}
+
+async function requestDictationWakeLock() {
+  if (!("wakeLock" in navigator) || dictationWakeLock) return;
+  try {
+    dictationWakeLock = await navigator.wakeLock.request("screen");
+    dictationWakeLock.addEventListener("release", () => {
+      dictationWakeLock = null;
+      if (dictationWanted && document.visibilityState === "visible") {
+        requestDictationWakeLock();
+      }
+    });
+  } catch {
+    dictationWakeLock = null;
+  }
+}
+
+async function releaseDictationWakeLock() {
+  if (!dictationWakeLock) return;
+  const lock = dictationWakeLock;
+  dictationWakeLock = null;
+  try {
+    await lock.release();
+  } catch {
+    // The browser may already have released it.
+  }
+}
+
+function scheduleDictationRestart(delay = 500) {
+  if (!dictationWanted) return;
+  clearTimeout(dictationRestartHandle);
+  dictationRestartHandle = setTimeout(() => {
+    if (dictationWanted && !recognizing && document.visibilityState === "visible") {
+      startDictation();
+    }
+  }, delay);
+}
+
+async function startDictation() {
+  if (!recognition || recognizing) return;
+  dictationWanted = true;
+  clearTimeout(dictationRestartHandle);
+  updateDictationUi("Activando microfono...");
+  requestDictationWakeLock();
+  try {
+    recognition.start();
+  } catch {
+    scheduleDictationRestart(900);
+  }
+}
+
+async function stopDictation() {
+  dictationWanted = false;
+  clearTimeout(dictationRestartHandle);
+  releaseDictationWakeLock();
+  if (!recognition || !recognizing) {
+    recognizing = false;
+    updateDictationUi("");
+    return;
+  }
+  recognition.stop();
+}
+
 function setupDictation() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -695,18 +815,30 @@ function setupDictation() {
 
   recognition.onstart = () => {
     recognizing = true;
-    els.dictationBtn.textContent = "Detener dictado";
-    els.dictationStatus.textContent = "Escuchando";
+    updateDictationUi("Escuchando en continuo");
   };
 
   recognition.onend = () => {
     recognizing = false;
-    els.dictationBtn.textContent = "Dictado en vivo";
-    els.dictationStatus.textContent = "";
+    if (dictationWanted) {
+      updateDictationUi("Reanudando escucha...");
+      scheduleDictationRestart(450);
+    } else {
+      updateDictationUi("");
+    }
   };
 
   recognition.onerror = (event) => {
-    showToast(event.error || "Error de dictado.");
+    if (["not-allowed", "service-not-allowed"].includes(event.error)) {
+      dictationWanted = false;
+      releaseDictationWakeLock();
+    }
+    if (event.error !== "no-speech") {
+      showToast(event.error || "Error de dictado.");
+    }
+    if (dictationWanted) {
+      scheduleDictationRestart(event.error === "no-speech" ? 350 : 900);
+    }
   };
 
   recognition.onresult = (event) => {
@@ -722,24 +854,18 @@ function setupDictation() {
     }
 
     if (finalText) {
-      const session = currentSession();
-      const separator = els.transcriptInput.value.trim() ? "\n" : "";
-      els.transcriptInput.value += `${separator}${finalText.trim()}`;
-      if (session) {
-        session.transcript = els.transcriptInput.value;
-        markSessionUpdated(session);
-      }
+      appendDictationText(finalText);
     }
-    els.dictationStatus.textContent = interimText ? interimText.trim() : "Escuchando";
+    updateDictationUi(interimText ? interimText.trim() : "Escuchando en continuo");
   };
 }
 
 function toggleDictation() {
   if (!recognition) return;
-  if (recognizing) {
-    recognition.stop();
+  if (recognizing || dictationWanted) {
+    stopDictation();
   } else {
-    recognition.start();
+    startDictation();
   }
 }
 
@@ -774,6 +900,14 @@ function registerServiceWorker() {
 }
 
 function bindEvents() {
+  document.addEventListener("visibilitychange", () => {
+    if (!dictationWanted) return;
+    if (document.visibilityState === "visible") {
+      requestDictationWakeLock();
+      scheduleDictationRestart(300);
+    }
+  });
+
   for (const tab of els.mobileTabs) {
     tab.addEventListener("click", () => setMobileView(tab.dataset.targetView));
   }
