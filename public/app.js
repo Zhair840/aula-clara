@@ -718,16 +718,37 @@ function removeDictationOverlap(existingText, incomingText) {
   return incomingWords.slice(overlap).join(" ").trim();
 }
 
+function collapseRepeatedDictationWords(text) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const result = [];
+  for (const word of words) {
+    const key = compactText(word);
+    const previousKey = compactText(result[result.length - 1] || "");
+    if (key && key === previousKey) {
+      continue;
+    }
+    result.push(word);
+  }
+  return result.join(" ");
+}
+
+function joinDictationText(existingText, newText) {
+  const existing = existingText.trimEnd();
+  if (!existing) return newText;
+  const lastChar = existing.slice(-1);
+  const separator = /[.!?]$/.test(lastChar) ? "\n" : " ";
+  return `${existing}${separator}${newText}`;
+}
+
 function appendDictationText(text) {
-  const cleanText = text.trim().replace(/\s+/g, " ");
+  const cleanText = collapseRepeatedDictationWords(text.trim().replace(/\s+/g, " "));
   if (!cleanText) return;
 
   const newText = removeDictationOverlap(els.transcriptInput.value, cleanText);
   if (!newText) return;
 
   const session = currentSession();
-  const separator = els.transcriptInput.value.trim() ? "\n" : "";
-  els.transcriptInput.value += `${separator}${newText}`;
+  els.transcriptInput.value = joinDictationText(els.transcriptInput.value, newText);
   if (session) {
     session.transcript = els.transcriptInput.value;
     markSessionUpdated(session);
@@ -812,6 +833,7 @@ function setupDictation() {
   recognition.lang = "es-PE";
   recognition.continuous = true;
   recognition.interimResults = true;
+  recognition.maxAlternatives = 3;
 
   recognition.onstart = () => {
     recognizing = true;
@@ -822,7 +844,7 @@ function setupDictation() {
     recognizing = false;
     if (dictationWanted) {
       updateDictationUi("Reanudando escucha...");
-      scheduleDictationRestart(450);
+      scheduleDictationRestart(220);
     } else {
       updateDictationUi("");
     }
@@ -837,7 +859,7 @@ function setupDictation() {
       showToast(event.error || "Error de dictado.");
     }
     if (dictationWanted) {
-      scheduleDictationRestart(event.error === "no-speech" ? 350 : 900);
+      scheduleDictationRestart(event.error === "no-speech" ? 180 : 700);
     }
   };
 
